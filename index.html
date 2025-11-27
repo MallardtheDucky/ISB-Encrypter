@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISB // ENCRYPTION TERMINAL MK-V</title>
+    <title>ISB // ENCRYPTION TERMINAL MK-VI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap');
@@ -204,9 +204,9 @@
             display: flex;
             gap: 4px;
             justify-content: center;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             background: #e0e0e0;
-            padding: 10px 5px;
+            padding: 8px 5px;
             border: 1px solid #bbb;
         }
 
@@ -219,7 +219,7 @@
         
         .rotor-window {
             width: 45px;
-            height: 50px;
+            height: 40px;
             background: linear-gradient(180deg, #222, #333, #222);
             color: #fff;
             display: flex;
@@ -239,7 +239,7 @@
             border: 1px solid #999;
             border-radius: 4px;
             overflow: hidden;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             cursor: pointer;
         }
         .mode-option {
@@ -257,6 +257,63 @@
         .mode-option.decrypt-active {
             background: var(--isb-accent); /* Orange for decrypt */
             color: #fff;
+        }
+
+        /* --- Patch Matrix (Plugboard) --- */
+        .patch-matrix {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 4px;
+            margin-top: 10px;
+            background: #d4d4d4;
+            padding: 8px;
+            border: 1px solid #999;
+        }
+
+        .patch-node {
+            aspect-ratio: 1;
+            background: #2a2a2a;
+            border: 1px solid #555;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .patch-node:hover {
+            border-color: var(--isb-active);
+            color: #fff;
+        }
+        .patch-node.pending {
+            background: #444;
+            color: #fff;
+            border-color: #fff;
+            animation: pulse-white 1s infinite;
+        }
+        .patch-node.connected {
+            background: var(--isb-accent); /* Orange for connection */
+            color: #000;
+            border-color: var(--isb-dark);
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+        /* Tooltip for connected pair */
+        .patch-node.connected::after {
+            content: attr(data-pair);
+            position: absolute;
+            font-size: 0.6rem;
+            bottom: 1px;
+            right: 1px;
+            opacity: 0.6;
+        }
+
+        @keyframes pulse-white {
+            0% { box-shadow: 0 0 0 rgba(255,255,255,0); }
+            50% { box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+            100% { box-shadow: 0 0 0 rgba(255,255,255,0); }
         }
 
         /* --- Lamps --- */
@@ -336,6 +393,27 @@
             padding: 2px 6px; font-size: 0.7rem;
         }
 
+        .reflector-toggle {
+            display: flex;
+            gap: 2px;
+            background: #999;
+            padding: 2px;
+            margin-bottom: 10px;
+        }
+        .reflector-opt {
+            flex: 1;
+            text-align: center;
+            font-size: 0.65rem;
+            padding: 2px;
+            cursor: pointer;
+            background: #ccc;
+        }
+        .reflector-opt.active {
+            background: #222;
+            color: var(--isb-active);
+            font-weight: bold;
+        }
+
         /* Slider */
         input[type=range] {
             -webkit-appearance: none;
@@ -353,6 +431,15 @@
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%; height: 4px; background: #999;
         }
+
+        .action-link {
+            cursor: pointer;
+            text-decoration: underline;
+            margin-left: 8px;
+            font-size: 0.7rem;
+            color: #444;
+        }
+        .action-link:hover { color: var(--isb-active); }
 
     </style>
 </head>
@@ -387,7 +474,7 @@
                 <div class="isb-logo">ISB</div>
                 <div>
                     <h1 class="text-xl font-bold tracking-widest text-black">IMPERIAL SECURITY BUREAU</h1>
-                    <div class="text-xs text-gray-600 font-bold uppercase">Encryption Facility // Sector 4 // Node-Alpha</div>
+                    <div class="text-xs text-gray-600 font-bold uppercase">Encryption Facility // Sector 4 // Node-Beta</div>
                 </div>
             </div>
             <div class="flex flex-col items-end text-xs font-bold text-gray-700">
@@ -406,7 +493,7 @@
             <div class="panel">
                 <div class="panel-title">
                     <span>Cypher Protocol</span>
-                    <span class="status-badge">MK-V</span>
+                    <span class="status-badge">MK-VI</span>
                 </div>
 
                 <!-- Mode Toggle -->
@@ -416,13 +503,20 @@
                 </div>
 
                 <!-- Keyword Input -->
-                <div class="mb-4">
-                    <label class="text-xs font-bold text-gray-500 mb-1 block">SESSION KEYWORD (SETS RINGS)</label>
-                    <input type="text" id="keyword-input" class="isb-input" placeholder="ENTER KEY (E.G. DEATHSTAR)" onkeyup="updateKeyword()">
+                <div class="mb-2">
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">SESSION KEYWORD</label>
+                    <input type="text" id="keyword-input" class="isb-input" placeholder="KEYWORD" onkeyup="updateKeyword()">
                 </div>
 
+                 <!-- Reflector Selection -->
+                 <label class="text-xs font-bold text-gray-500 mb-1 block">REFLECTOR UNIT</label>
+                 <div class="reflector-toggle">
+                     <div class="reflector-opt active" id="ref-b" onclick="setReflector('B')">UKW-B (STD)</div>
+                     <div class="reflector-opt" id="ref-c" onclick="setReflector('C')">UKW-C (HEAVY)</div>
+                 </div>
+
                 <!-- Rotor Controls -->
-                <div class="text-xs font-bold text-center text-gray-500 mb-1">ROTOR POSITION (START)</div>
+                <div class="text-xs font-bold text-center text-gray-500 mb-1">ROTOR POSITION</div>
                 <div class="rotor-rack">
                     <!-- Rotors 0-3 -->
                     <div class="rotor-unit">
@@ -448,12 +542,23 @@
                 </div>
 
                 <!-- Harmonic Frequency -->
-                <div class="bg-gray-300 p-3 border border-gray-400 mt-2">
-                    <div class="flex justify-between text-xs font-bold mb-2">
+                <div class="bg-gray-300 p-2 border border-gray-400 mt-2">
+                    <div class="flex justify-between text-xs font-bold mb-1">
                         <span>HARMONIC SHIFT</span>
                         <span id="freq-val" class="text-blue-700">00</span>
                     </div>
                     <input type="range" min="0" max="25" value="0" id="harmonic-slider" oninput="updateHarmonic()">
+                </div>
+
+                <!-- Patch Matrix -->
+                <div class="mt-2 flex-1 flex flex-col min-h-0">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-500">ION-FLUX PATCHING</span>
+                        <span class="text-[9px] cursor-pointer text-red-700 hover:text-red-500 font-bold" onclick="resetPlugs()">CLEAR</span>
+                    </div>
+                    <div class="patch-matrix" id="patch-matrix">
+                        <!-- Generated by JS -->
+                    </div>
                 </div>
             </div>
 
@@ -469,17 +574,23 @@
                 </div>
 
                 <div class="flex-1 flex flex-col gap-2">
-                    <div class="bg-white border border-gray-400 p-2 flex-1">
-                        <div class="flex justify-between mb-1">
+                    <div class="bg-white border border-gray-400 p-2 flex-1 relative">
+                        <div class="flex justify-between mb-1 items-center">
                             <span class="text-xs font-bold bg-black text-white px-1">INPUT STREAM</span>
-                            <span class="text-xs text-red-600 font-bold" id="status-indicator">STANDBY</span>
+                            <div class="flex gap-2">
+                                <span class="text-xs cursor-pointer font-bold text-blue-600 hover:text-blue-800 uppercase" onclick="pasteInputButton()">[ PASTE ]</span>
+                                <span class="text-xs text-red-600 font-bold" id="status-indicator">STANDBY</span>
+                            </div>
                         </div>
-                        <textarea id="input-text" placeholder="INITIALIZE DATA ENTRY..." onkeydown="handleKey(event)" onkeyup="handleKeyUp(event)"></textarea>
+                        <textarea id="input-text" placeholder="INITIALIZE DATA ENTRY..." onkeydown="handleKey(event)" onkeyup="handleKeyUp(event)" onpaste="handlePaste(event)"></textarea>
                     </div>
-                    <div class="bg-gray-800 border border-black p-2 flex-1">
-                         <div class="flex justify-between mb-1">
+                    <div class="bg-gray-800 border border-black p-2 flex-1 relative">
+                         <div class="flex justify-between mb-1 items-center">
                             <span class="text-xs font-bold text-blue-300">OUTPUT STREAM</span>
-                            <button onclick="copyOutput()" class="text-xs text-white underline hover:text-blue-300">TRANSFER</button>
+                            <div class="flex gap-3">
+                                <button onclick="transferOutputToInput()" class="text-xs text-orange-400 font-bold hover:text-orange-200 uppercase">[ CYCLE ]</button>
+                                <button onclick="copyOutput()" class="text-xs text-white underline hover:text-blue-300">TRANSFER</button>
+                            </div>
                         </div>
                         <textarea id="output-text" readonly class="bg-gray-900 text-blue-400 border-none focus:ring-0 font-bold font-mono"></textarea>
                     </div>
@@ -560,6 +671,12 @@
                 gain.gain.setValueAtTime(0.1, now);
                 gain.gain.linearRampToValueAtTime(0, now + 0.1);
                 osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'plug') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
             }
         }
 
@@ -571,15 +688,22 @@
             II:    { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE", notch: 'E' },
             III:   { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO", notch: 'V' }
         };
-        const REFLECTOR = "ENKQAUYWJICOPBLMDXZVFTHRGS"; // Thin B
+        const REFLECTORS = {
+            B: "ENKQAUYWJICOPBLMDXZVFTHRGS", // Thin B
+            C: "FVPJIAOYEDRZXWGCTKUQSBNMHL"  // Thin C
+        };
 
         let state = {
             rotors: [0, 0, 0, 0], // Positions
             rings: [0, 0, 0, 0],  // Ring Settings (Set by Keyword)
             rotorConfig: ['Beta', 'I', 'II', 'III'],
+            reflector: 'B',
             harmonic: 0,
-            mode: 'encrypt' // 'encrypt' or 'decrypt'
+            mode: 'encrypt', // 'encrypt' or 'decrypt'
+            plugs: {} // Map 'A' -> 'Z'
         };
+
+        let pendingPlug = null;
 
         function mod(n, m) { return ((n % m) + m) % m; }
         function charToNum(c) { return alphabet.indexOf(c); }
@@ -588,38 +712,42 @@
         function encryptCharacter(inputChar) {
             if (!alphabet.includes(inputChar)) return inputChar;
 
-            // 1. Pre-Processing (Decrypt Mode: Reverse Harmonic)
-            let signal = charToNum(inputChar);
+            // 1. PLUGBOARD (Entrance)
+            let char = state.plugs[inputChar] || inputChar;
+            let signal = charToNum(char);
             
+            // 2. Harmonic Shift Pre-Processing (Decrypt Reverse)
             if (state.mode === 'decrypt') {
                 signal = mod(signal - parseInt(state.harmonic), 26);
             }
 
-            // 2. Step Rotors (Forward step before electrical signal)
+            // 3. Step Rotors (Forward step before electrical signal)
             stepRotors();
             updateRotorDisplay();
 
-            // 3. Enigma Path (Reciprocal)
+            // 4. Enigma Path (Reciprocal)
             // Forward Pass
             for (let i = 3; i >= 0; i--) signal = rotorPass(signal, i, true);
             // Reflector
-            signal = charToNum(REFLECTOR[signal]);
+            const refWiring = REFLECTORS[state.reflector];
+            signal = charToNum(refWiring[signal]);
             // Reverse Pass
             for (let i = 0; i <= 3; i++) signal = rotorPass(signal, i, false);
 
-            // 4. Post-Processing (Encrypt Mode: Add Harmonic)
+            // 5. Harmonic Shift Post-Processing (Encrypt Forward)
             if (state.mode === 'encrypt') {
                 signal = mod(signal + parseInt(state.harmonic), 26);
             }
 
-            return numToChar(signal);
+            // 6. PLUGBOARD (Exit)
+            let outChar = numToChar(signal);
+            outChar = state.plugs[outChar] || outChar;
+
+            return outChar;
         }
 
         function stepRotors() {
-            // Simplified stepping for M4
-            // R3 (Fast) always steps.
-            // R2 steps if R3 at notch.
-            // R1 steps if R2 at notch (Double Step).
+            // M4 Stepping Logic
             const r1 = state.rotors[1];
             const r2 = state.rotors[2];
             const r3 = state.rotors[3];
@@ -667,6 +795,18 @@
                 lamp.innerText = char;
                 board.appendChild(lamp);
             });
+
+            // Patch Matrix
+            const matrix = document.getElementById('patch-matrix');
+            alphabet.split('').forEach(char => {
+                const node = document.createElement('div');
+                node.className = 'patch-node';
+                node.id = `node-${char}`;
+                node.innerText = char;
+                node.onclick = () => handlePlugClick(char);
+                matrix.appendChild(node);
+            });
+
             startDatastream();
         }
 
@@ -702,7 +842,6 @@
             const btnEnc = document.getElementById('mode-enc');
             const btnDec = document.getElementById('mode-dec');
             const output = document.getElementById('output-text');
-            const input = document.getElementById('input-text');
 
             if (mode === 'encrypt') {
                 btnEnc.classList.add('active');
@@ -717,12 +856,76 @@
             }
         }
 
+        function setReflector(ref) {
+            state.reflector = ref;
+            document.getElementById('ref-b').classList.toggle('active', ref === 'B');
+            document.getElementById('ref-c').classList.toggle('active', ref === 'C');
+            log(`REFLECTOR CHANGED: UKW-${ref}`);
+            playSound('click');
+        }
+
+        function handlePlugClick(char) {
+            playSound('plug');
+            
+            // 1. If clicking an already connected node, disconnect the pair
+            if (state.plugs[char]) {
+                const partner = state.plugs[char];
+                delete state.plugs[char];
+                delete state.plugs[partner];
+                log(`PATCH DISCONNECTED: ${char}-${partner}`);
+                updateMatrixVisuals();
+                return;
+            }
+
+            // 2. If clicking the pending selection, cancel it
+            if (pendingPlug === char) {
+                pendingPlug = null;
+                updateMatrixVisuals();
+                return;
+            }
+
+            // 3. If clicking a new node while one is pending, create connection
+            if (pendingPlug) {
+                state.plugs[char] = pendingPlug;
+                state.plugs[pendingPlug] = char;
+                log(`PATCH ESTABLISHED: ${char}-${pendingPlug}`);
+                pendingPlug = null;
+                updateMatrixVisuals();
+                return;
+            }
+
+            // 4. If clicking a new node with nothing pending, set pending
+            pendingPlug = char;
+            updateMatrixVisuals();
+        }
+
+        function updateMatrixVisuals() {
+            alphabet.split('').forEach(char => {
+                const el = document.getElementById(`node-${char}`);
+                el.className = 'patch-node';
+                el.removeAttribute('data-pair');
+
+                if (state.plugs[char]) {
+                    el.classList.add('connected');
+                    el.setAttribute('data-pair', state.plugs[char]);
+                } else if (pendingPlug === char) {
+                    el.classList.add('pending');
+                }
+            });
+        }
+
+        function resetPlugs() {
+            state.plugs = {};
+            pendingPlug = null;
+            updateMatrixVisuals();
+            log("PATCH MATRIX CLEARED");
+            playSound('rotor');
+        }
+
         function updateKeyword() {
             const val = document.getElementById('keyword-input').value.toUpperCase().replace(/[^A-Z]/g, '');
             document.getElementById('keyword-input').value = val;
             
-            // Map keyword characters to Ring Settings
-            // If keyword is shorter than 4, pad with A. If longer, truncate.
             for(let i=0; i<4; i++) {
                 if (i < val.length) {
                     state.rings[i] = charToNum(val[i]);
@@ -734,9 +937,23 @@
         }
 
         function handleKey(e) {
+            // Allow Control/Command combinations to pass through (like Ctrl+V, Ctrl+C)
+            if (e.ctrlKey || e.metaKey) return;
+
             if(e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
                 e.preventDefault();
                 processInput(e.key.toUpperCase());
+            } else if (e.key === "Backspace") {
+                // Let backspace happen naturally but note it doesn't reverse rotors
+            }
+        }
+
+        // New specific Paste Handler for Ctrl+V event
+        function handlePaste(e) {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text');
+            if (text) {
+                processLargeText(text);
             }
         }
 
@@ -784,15 +1001,78 @@
             copyText.select();
             document.execCommand("copy");
             log("OUTPUT COPIED TO CLIPBOARD");
+            playSound('grant');
+        }
+
+        // Fallback button for Paste (if Ctrl+V isn't used)
+        async function pasteInputButton() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    processLargeText(text);
+                }
+            } catch (err) {
+                log("CLIPBOARD ACCESS DENIED. USE CTRL+V");
+                alert("Browser blocked clipboard access. Please click inside the Input box and press Ctrl+V.");
+            }
+        }
+        
+        // Handles typing large chunks of text (from paste) with animation
+        function processLargeText(text) {
+            const clean = text.replace(/[^a-zA-Z]/g, '').toUpperCase();
+            log(`PROCESSING ${clean.length} CHARS FROM STREAM...`);
+            
+            let i = 0;
+            function typeNext() {
+                if(i < clean.length) {
+                    processInput(clean[i]);
+                    i++;
+                    // Speed up processing for large chunks so it doesn't take forever
+                    const delay = clean.length > 50 ? 5 : 20; 
+                    setTimeout(typeNext, delay);
+                } else {
+                    handleKeyUp(); // Clear lamps when done
+                }
+            }
+            typeNext();
+        }
+
+        function transferOutputToInput() {
+            const output = document.getElementById('output-text').value;
+            if(!output) return;
+            
+            document.getElementById('input-text').value = ""; // Clear input
+            document.getElementById('output-text').value = ""; // Clear output
+            
+            log(`CYCLING DATA STREAM...`);
+            
+            const clean = output.replace(/[^a-zA-Z]/g, '').toUpperCase();
+            
+            let i = 0;
+            function typeNext() {
+                if(i < clean.length) {
+                    processInput(clean[i]);
+                    i++;
+                    setTimeout(typeNext, 20);
+                } else {
+                    handleKeyUp();
+                }
+            }
+            typeNext();
         }
 
         function resetMachine() {
             state.rotors = [0,0,0,0];
             state.rings = [0,0,0,0];
+            state.harmonic = 0;
+            resetPlugs();
+            
             document.getElementById('input-text').value = "";
             document.getElementById('output-text').value = "";
             document.getElementById('keyword-input').value = "";
             document.getElementById('harmonic-slider').value = 0;
+            setReflector('B');
+            
             updateHarmonic();
             updateRotorDisplay();
             log("SYSTEM PURGED.");
