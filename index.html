@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ISB // ENCRYPTION TERMINAL MK-VI</title>
+    <title>ISB // ENCRYPTION TERMINAL MK-VII</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap');
@@ -230,7 +230,11 @@
             margin: 2px 0;
             border: 2px solid #000;
             box-shadow: inset 0 0 5px #000;
+            transition: transform 0.1s;
         }
+        .rotor-window.moving-up { transform: translateY(-2px); }
+        .rotor-window.moving-down { transform: translateY(2px); }
+
 
         /* --- Mode Toggle --- */
         .mode-toggle {
@@ -341,15 +345,16 @@
             font-weight: bold;
             font-size: 0.8rem;
             border: 1px solid #000;
-            transition: all 0.05s;
+            transition: all 0.1s ease-out;
         }
 
         .lamp.active {
             background: #ffcc00;
             color: #fff;
-            box-shadow: 0 0 15px #ffcc00;
+            box-shadow: 0 0 25px #ffcc00, 0 0 5px #fff;
             border-color: #fff;
             text-shadow: 0 0 5px #000;
+            transform: scale(1.1);
         }
 
         /* --- Text Areas --- */
@@ -432,14 +437,23 @@
             width: 100%; height: 4px; background: #999;
         }
 
-        .action-link {
+        .mute-btn {
+            width: 24px; height: 24px;
+            border: 1px solid #999;
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
-            text-decoration: underline;
-            margin-left: 8px;
             font-size: 0.7rem;
-            color: #444;
+            background: #ccc;
         }
-        .action-link:hover { color: var(--isb-active); }
+        .mute-btn.muted { background: #ff3300; color: white; border-color: #500; }
+
+        .btn-text {
+             font-size: 0.65rem; 
+             font-weight: bold; 
+             text-transform: uppercase;
+             cursor: pointer;
+        }
+        .btn-text:hover { color: var(--isb-active); }
 
     </style>
 </head>
@@ -474,15 +488,18 @@
                 <div class="isb-logo">ISB</div>
                 <div>
                     <h1 class="text-xl font-bold tracking-widest text-black">IMPERIAL SECURITY BUREAU</h1>
-                    <div class="text-xs text-gray-600 font-bold uppercase">Encryption Facility // Sector 4 // Node-Beta</div>
+                    <div class="text-xs text-gray-600 font-bold uppercase">Encryption Facility // Sector 4 // Node-Gamma</div>
                 </div>
             </div>
-            <div class="flex flex-col items-end text-xs font-bold text-gray-700">
-                <div class="flex items-center gap-2">
-                    <span>SECURE UPLINK</span>
-                    <div class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></div>
+            <div class="flex items-center gap-4">
+                <div class="mute-btn" id="mute-btn" onclick="toggleMute()">VOL</div>
+                <div class="flex flex-col items-end text-xs font-bold text-gray-700">
+                    <div class="flex items-center gap-2">
+                        <span>SECURE UPLINK</span>
+                        <div class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></div>
+                    </div>
+                    <div>ID: AGENT 44-K</div>
                 </div>
-                <div>ID: AGENT 44-K</div>
             </div>
         </div>
 
@@ -493,7 +510,7 @@
             <div class="panel">
                 <div class="panel-title">
                     <span>Cypher Protocol</span>
-                    <span class="status-badge">MK-VI</span>
+                    <span class="status-badge">MK-VII</span>
                 </div>
 
                 <!-- Mode Toggle -->
@@ -577,8 +594,9 @@
                     <div class="bg-white border border-gray-400 p-2 flex-1 relative">
                         <div class="flex justify-between mb-1 items-center">
                             <span class="text-xs font-bold bg-black text-white px-1">INPUT STREAM</span>
-                            <div class="flex gap-2">
-                                <span class="text-xs cursor-pointer font-bold text-blue-600 hover:text-blue-800 uppercase" onclick="pasteInputButton()">[ PASTE ]</span>
+                            <div class="flex gap-3">
+                                <span class="btn-text text-gray-500 hover:text-red-500" onclick="clearInput()">[ CLEAR ]</span>
+                                <span class="btn-text text-blue-600" onclick="pasteInputButton()">[ PASTE ]</span>
                                 <span class="text-xs text-red-600 font-bold" id="status-indicator">STANDBY</span>
                             </div>
                         </div>
@@ -588,6 +606,7 @@
                          <div class="flex justify-between mb-1 items-center">
                             <span class="text-xs font-bold text-blue-300">OUTPUT STREAM</span>
                             <div class="flex gap-3">
+                                <span class="btn-text text-gray-500 hover:text-red-500" onclick="clearOutput()">[ CLEAR ]</span>
                                 <button onclick="transferOutputToInput()" class="text-xs text-orange-400 font-bold hover:text-orange-200 uppercase">[ CYCLE ]</button>
                                 <button onclick="copyOutput()" class="text-xs text-white underline hover:text-blue-300">TRANSFER</button>
                             </div>
@@ -613,6 +632,7 @@
 
                 <div class="panel-title" style="border-color: #005500; color: #00cc00;">
                     <span>System Log</span>
+                    <span class="btn-text text-white hover:text-green-300" onclick="downloadLog()">[ SAVE ]</span>
                 </div>
                 <div id="log-container" class="font-mono text-[10px] space-y-1 h-1/2 overflow-y-auto text-green-500 p-1">
                     <div>> SYSTEM READY_</div>
@@ -632,8 +652,16 @@
     <script>
         // --- AUDIO ENGINE ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let isMuted = false;
         
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('mute-btn').classList.toggle('muted', isMuted);
+            log(isMuted ? "AUDIO SYSTEMS DISABLED" : "AUDIO SYSTEMS ENABLED");
+        }
+
         function playSound(type) {
+            if (isMuted) return;
             if (audioCtx.state === 'suspended') audioCtx.resume();
             
             const osc = audioCtx.createOscillator();
@@ -677,6 +705,13 @@
                 gain.gain.setValueAtTime(0.1, now);
                 gain.gain.linearRampToValueAtTime(0, now + 0.1);
                 osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'undo') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(200, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
             }
         }
 
@@ -700,7 +735,8 @@
             reflector: 'B',
             harmonic: 0,
             mode: 'encrypt', // 'encrypt' or 'decrypt'
-            plugs: {} // Map 'A' -> 'Z'
+            plugs: {}, // Map 'A' -> 'Z'
+            history: [] // Stores rotor state for Undo
         };
 
         let pendingPlug = null;
@@ -866,8 +902,6 @@
 
         function handlePlugClick(char) {
             playSound('plug');
-            
-            // 1. If clicking an already connected node, disconnect the pair
             if (state.plugs[char]) {
                 const partner = state.plugs[char];
                 delete state.plugs[char];
@@ -876,15 +910,11 @@
                 updateMatrixVisuals();
                 return;
             }
-
-            // 2. If clicking the pending selection, cancel it
             if (pendingPlug === char) {
                 pendingPlug = null;
                 updateMatrixVisuals();
                 return;
             }
-
-            // 3. If clicking a new node while one is pending, create connection
             if (pendingPlug) {
                 state.plugs[char] = pendingPlug;
                 state.plugs[pendingPlug] = char;
@@ -893,8 +923,6 @@
                 updateMatrixVisuals();
                 return;
             }
-
-            // 4. If clicking a new node with nothing pending, set pending
             pendingPlug = char;
             updateMatrixVisuals();
         }
@@ -937,18 +965,39 @@
         }
 
         function handleKey(e) {
-            // Allow Control/Command combinations to pass through (like Ctrl+V, Ctrl+C)
             if (e.ctrlKey || e.metaKey) return;
+
+            if (e.key === "Backspace") {
+                e.preventDefault();
+                performUndo();
+                return;
+            }
 
             if(e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
                 e.preventDefault();
                 processInput(e.key.toUpperCase());
-            } else if (e.key === "Backspace") {
-                // Let backspace happen naturally but note it doesn't reverse rotors
             }
         }
 
-        // New specific Paste Handler for Ctrl+V event
+        function performUndo() {
+            const inputEl = document.getElementById('input-text');
+            const outputEl = document.getElementById('output-text');
+            
+            if (inputEl.value.length === 0 || state.history.length === 0) return;
+
+            // 1. Pop previous rotor state
+            const prevRotors = state.history.pop();
+            state.rotors = [...prevRotors]; // Restore
+            
+            // 2. Remove last char from UI
+            inputEl.value = inputEl.value.slice(0, -1);
+            outputEl.value = outputEl.value.slice(0, -1);
+            
+            updateRotorDisplay();
+            playSound('undo');
+            log("CORRECTION APPLIED: REVERSED");
+        }
+
         function handlePaste(e) {
             e.preventDefault();
             const text = (e.clipboardData || window.clipboardData).getData('text');
@@ -965,9 +1014,12 @@
 
         function processInput(char) {
             playSound('click');
+            
+            // SAVE STATE FOR UNDO
+            state.history.push([...state.rotors]);
+
             const result = encryptCharacter(char);
             
-            // Lamp logic: Always light up the result char
             const lamp = document.getElementById(`lamp-${result}`);
             if(lamp) lamp.classList.add('active');
 
@@ -987,7 +1039,16 @@
 
         function updateRotorDisplay() {
             for(let i=0; i<4; i++) {
-                document.getElementById(`rotor-${i}`).innerText = alphabet[state.rotors[i]];
+                const el = document.getElementById(`rotor-${i}`);
+                const oldVal = el.innerText;
+                const newVal = alphabet[state.rotors[i]];
+                el.innerText = newVal;
+                
+                // Visual bounce
+                if (oldVal !== newVal) {
+                    el.classList.add('moving-up');
+                    setTimeout(() => el.classList.remove('moving-up'), 100);
+                }
             }
         }
 
@@ -1004,20 +1065,28 @@
             playSound('grant');
         }
 
-        // Fallback button for Paste (if Ctrl+V isn't used)
+        function clearOutput() {
+            document.getElementById('output-text').value = "";
+            log("OUTPUT STREAM CLEARED");
+            playSound('click');
+        }
+
+        function clearInput() {
+            document.getElementById('input-text').value = "";
+            state.history = []; // Clear history if input is wiped
+            log("INPUT STREAM CLEARED");
+            playSound('click');
+        }
+
         async function pasteInputButton() {
             try {
                 const text = await navigator.clipboard.readText();
-                if(text) {
-                    processLargeText(text);
-                }
+                if(text) processLargeText(text);
             } catch (err) {
                 log("CLIPBOARD ACCESS DENIED. USE CTRL+V");
-                alert("Browser blocked clipboard access. Please click inside the Input box and press Ctrl+V.");
             }
         }
         
-        // Handles typing large chunks of text (from paste) with animation
         function processLargeText(text) {
             const clean = text.replace(/[^a-zA-Z]/g, '').toUpperCase();
             log(`PROCESSING ${clean.length} CHARS FROM STREAM...`);
@@ -1027,11 +1096,10 @@
                 if(i < clean.length) {
                     processInput(clean[i]);
                     i++;
-                    // Speed up processing for large chunks so it doesn't take forever
                     const delay = clean.length > 50 ? 5 : 20; 
                     setTimeout(typeNext, delay);
                 } else {
-                    handleKeyUp(); // Clear lamps when done
+                    handleKeyUp();
                 }
             }
             typeNext();
@@ -1041,13 +1109,12 @@
             const output = document.getElementById('output-text').value;
             if(!output) return;
             
-            document.getElementById('input-text').value = ""; // Clear input
-            document.getElementById('output-text').value = ""; // Clear output
+            document.getElementById('input-text').value = ""; 
+            document.getElementById('output-text').value = ""; 
+            state.history = [];
             
             log(`CYCLING DATA STREAM...`);
-            
             const clean = output.replace(/[^a-zA-Z]/g, '').toUpperCase();
-            
             let i = 0;
             function typeNext() {
                 if(i < clean.length) {
@@ -1065,6 +1132,7 @@
             state.rotors = [0,0,0,0];
             state.rings = [0,0,0,0];
             state.harmonic = 0;
+            state.history = [];
             resetPlugs();
             
             document.getElementById('input-text').value = "";
@@ -1077,6 +1145,19 @@
             updateRotorDisplay();
             log("SYSTEM PURGED.");
             playSound('rotor');
+        }
+
+        function downloadLog() {
+            const logContent = Array.from(document.getElementById('log-container').children)
+                .map(d => d.innerText).join('\n');
+            const blob = new Blob([logContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ISB_TRANSCRIPT_${Date.now()}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            log("TRANSCRIPT DOWNLOADED");
         }
 
         function log(msg) {
