@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISB // ENCRYPTION TERMINAL MK-V</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap');
+
+        :root {
+            --isb-white: #e3e3e3;
+            --isb-grey: #a0a0a0;
+            --isb-dark: #111111;
+            --isb-accent: #ff3300; /* Alert Orange */
+            --isb-active: #00e5ff; /* Holo Blue */
+            --panel-bg: #f4f4f4;
+            --border-color: #555;
+        }
+
+        body {
+            background-color: #050505;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--isb-dark);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* --- CRT Scanline & Vignette --- */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.05) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.5;
+        }
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        /* --- Login Screen (Scanner Style) --- */
+        #login-overlay {
+            position: absolute;
+            inset: 0;
+            background: #080808;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.8s ease-in-out;
+        }
+
+        .scanner-unit {
+            width: 280px;
+            height: 280px;
+            position: relative;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+        }
+
+        /* Outer static ring */
+        .scanner-housing {
+            position: absolute;
+            width: 100%; height: 100%;
+            border: 2px solid #333;
+            border-radius: 50%;
+            background: radial-gradient(circle, #1a1a1a 0%, #000 70%);
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.05);
+        }
+
+        /* Rotating Scan Rings */
+        .scan-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px dashed #444;
+            transition: all 0.5s ease;
+        }
+
+        .ring-1 { width: 80%; height: 80%; border-color: #555; }
+        .ring-2 { width: 60%; height: 60%; border-color: #666; border-style: dotted; }
+        .ring-3 { width: 40%; height: 40%; border: 4px solid #222; background: #111; z-index: 10; }
+
+        /* Scanning Animation State */
+        .scanning .ring-1 {
+            border-color: var(--isb-active);
+            border-style: solid;
+            border-width: 2px;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 15px var(--isb-active);
+        }
+        .scanning .ring-2 {
+            border-color: var(--isb-active);
+            border-style: solid;
+            border-width: 2px;
+            border-bottom-color: transparent;
+            animation: spin-reverse 1.5s linear infinite;
+        }
+        .scanning .ring-3 {
+            background: #003333;
+            box-shadow: inset 0 0 20px var(--isb-active);
+            border-color: var(--isb-active);
+        }
+
+        .scanner-text {
+            position: absolute;
+            bottom: -60px;
+            color: #666;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+            font-size: 0.8rem;
+            transition: color 0.3s;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
+
+        /* --- Main Interface --- */
+        .isb-container {
+            width: 98vw;
+            height: 94vh;
+            background: var(--isb-white);
+            border: 1px solid var(--border-color);
+            display: grid;
+            grid-template-rows: 60px 1fr 30px;
+            box-shadow: 0 0 100px rgba(0,0,0,0.9);
+            opacity: 0;
+            pointer-events: none; /* Disabled until login */
+            transition: opacity 1.5s ease;
+        }
+
+        .top-bar {
+            background: #dcdcdc;
+            border-bottom: 2px solid var(--isb-dark);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr 300px;
+            gap: 2px;
+            background: var(--isb-dark);
+            overflow: hidden;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            overflow-y: hidden;
+            position: relative;
+        }
+
+        .panel-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            color: #444;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 0.4rem;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+        }
+
+        /* --- Inputs & Controls --- */
+        .isb-input {
+            background: #fff;
+            border: 1px solid #999;
+            padding: 4px 8px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            color: #000;
+            outline: none;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            width: 100%;
+        }
+        .isb-input:focus {
+            border-color: var(--isb-active);
+            box-shadow: 0 0 5px rgba(0, 229, 255, 0.3);
+        }
+
+        .rotor-rack {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            margin-bottom: 15px;
+            background: #e0e0e0;
+            padding: 10px 5px;
+            border: 1px solid #bbb;
+        }
+
+        .rotor-unit {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 60px;
+        }
+        
+        .rotor-window {
+            width: 45px;
+            height: 50px;
+            background: linear-gradient(180deg, #222, #333, #222);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-family: 'Orbitron', sans-serif;
+            margin: 2px 0;
+            border: 2px solid #000;
+            box-shadow: inset 0 0 5px #000;
+        }
+
+        /* --- Mode Toggle --- */
+        .mode-toggle {
+            display: flex;
+            background: #ccc;
+            border: 1px solid #999;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+        .mode-option {
+            flex: 1;
+            text-align: center;
+            padding: 6px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .mode-option.active {
+            background: var(--isb-dark);
+            color: #fff;
+        }
+        .mode-option.decrypt-active {
+            background: var(--isb-accent); /* Orange for decrypt */
+            color: #fff;
+        }
+
+        /* --- Lamps --- */
+        .lamp-board {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px;
+            padding: 15px;
+            background: #2a2a2a;
+            border: 4px solid #111;
+            margin-bottom: 10px;
+            box-shadow: inset 0 0 20px #000;
+        }
+
+        .lamp {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #151515;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            border: 1px solid #000;
+            transition: all 0.05s;
+        }
+
+        .lamp.active {
+            background: #ffcc00;
+            color: #fff;
+            box-shadow: 0 0 15px #ffcc00;
+            border-color: #fff;
+            text-shadow: 0 0 5px #000;
+        }
+
+        /* --- Text Areas --- */
+        textarea {
+            width: 100%;
+            height: 120px;
+            background: #fff;
+            border: 1px solid #999;
+            padding: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            resize: none;
+            outline: none;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: #000;
+        }
+        textarea:focus { border: 2px solid var(--isb-active); }
+
+        .isb-logo {
+            width: 40px; height: 40px;
+            border: 3px solid var(--isb-dark);
+            border-radius: 50%;
+            display: grid; place-items: center;
+            font-weight: 900; font-size: 0.7rem; letter-spacing: -1px;
+            background: #e3e3e3;
+            color: #000;
+        }
+
+        .btn-arrow {
+            width: 100%;
+            background: #bbb;
+            border: none;
+            height: 15px;
+            font-size: 8px;
+            cursor: pointer;
+        }
+        .btn-arrow:hover { background: #999; }
+        
+        .status-badge {
+            background: #000; color: #00e5ff; 
+            padding: 2px 6px; font-size: 0.7rem;
+        }
+
+        /* Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px; width: 14px;
+            background: var(--isb-dark);
+            border: 1px solid var(--isb-active);
+            cursor: pointer;
+            margin-top: -5px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; background: #999;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <!-- Login Screen -->
+    <div id="login-overlay">
+        <div style="font-size: 4rem; color: #fff; font-weight: 900; margin-bottom: 40px; letter-spacing: 5px; opacity: 0.9;">ISB</div>
+        
+        <div class="scanner-unit" id="scanner" onclick="triggerScan()">
+            <div class="scanner-housing"></div>
+            <div class="scan-ring ring-1"></div>
+            <div class="scan-ring ring-2"></div>
+            <div class="scan-ring ring-3"></div>
+            <div style="position: absolute; z-index: 20; color: #555; font-size: 0.7rem; font-weight: bold;">TOUCH TO SCAN</div>
+        </div>
+
+        <div class="scanner-text" id="scanner-text">
+            IDENTIFY SECURE CLEARANCE
+        </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div class="isb-container" id="main-interface">
+        
+        <!-- Header -->
+        <div class="top-bar">
+            <div class="flex items-center gap-4">
+                <div class="isb-logo">ISB</div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-widest text-black">IMPERIAL SECURITY BUREAU</h1>
+                    <div class="text-xs text-gray-600 font-bold uppercase">Encryption Facility // Sector 4 // Node-Alpha</div>
+                </div>
+            </div>
+            <div class="flex flex-col items-end text-xs font-bold text-gray-700">
+                <div class="flex items-center gap-2">
+                    <span>SECURE UPLINK</span>
+                    <div class="w-2 h-2 rounded-full bg-green-600 animate-pulse"></div>
+                </div>
+                <div>ID: AGENT 44-K</div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            
+            <!-- LEFT: Configuration -->
+            <div class="panel">
+                <div class="panel-title">
+                    <span>Cypher Protocol</span>
+                    <span class="status-badge">MK-V</span>
+                </div>
+
+                <!-- Mode Toggle -->
+                <div class="mode-toggle" id="mode-switch">
+                    <div class="mode-option active" id="mode-enc" onclick="setMode('encrypt')">ENCRYPT</div>
+                    <div class="mode-option" id="mode-dec" onclick="setMode('decrypt')">DECRYPT</div>
+                </div>
+
+                <!-- Keyword Input -->
+                <div class="mb-4">
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">SESSION KEYWORD (SETS RINGS)</label>
+                    <input type="text" id="keyword-input" class="isb-input" placeholder="ENTER KEY (E.G. DEATHSTAR)" onkeyup="updateKeyword()">
+                </div>
+
+                <!-- Rotor Controls -->
+                <div class="text-xs font-bold text-center text-gray-500 mb-1">ROTOR POSITION (START)</div>
+                <div class="rotor-rack">
+                    <!-- Rotors 0-3 -->
+                    <div class="rotor-unit">
+                        <button class="btn-arrow" onclick="rotateRotor(0, 1)">▲</button>
+                        <div class="rotor-window" id="rotor-0">A</div>
+                        <button class="btn-arrow" onclick="rotateRotor(0, -1)">▼</button>
+                    </div>
+                    <div class="rotor-unit">
+                        <button class="btn-arrow" onclick="rotateRotor(1, 1)">▲</button>
+                        <div class="rotor-window" id="rotor-1">A</div>
+                        <button class="btn-arrow" onclick="rotateRotor(1, -1)">▼</button>
+                    </div>
+                    <div class="rotor-unit">
+                        <button class="btn-arrow" onclick="rotateRotor(2, 1)">▲</button>
+                        <div class="rotor-window" id="rotor-2">A</div>
+                        <button class="btn-arrow" onclick="rotateRotor(2, -1)">▼</button>
+                    </div>
+                    <div class="rotor-unit">
+                        <button class="btn-arrow" onclick="rotateRotor(3, 1)">▲</button>
+                        <div class="rotor-window" id="rotor-3">A</div>
+                        <button class="btn-arrow" onclick="rotateRotor(3, -1)">▼</button>
+                    </div>
+                </div>
+
+                <!-- Harmonic Frequency -->
+                <div class="bg-gray-300 p-3 border border-gray-400 mt-2">
+                    <div class="flex justify-between text-xs font-bold mb-2">
+                        <span>HARMONIC SHIFT</span>
+                        <span id="freq-val" class="text-blue-700">00</span>
+                    </div>
+                    <input type="range" min="0" max="25" value="0" id="harmonic-slider" oninput="updateHarmonic()">
+                </div>
+            </div>
+
+            <!-- CENTER: Operation -->
+            <div class="panel bg-gray-200">
+                <div class="panel-title">
+                    <span>Processing Unit</span>
+                    <span>ACT-99</span>
+                </div>
+
+                <div class="lamp-board" id="lamp-board">
+                    <!-- Lamps generated via JS -->
+                </div>
+
+                <div class="flex-1 flex flex-col gap-2">
+                    <div class="bg-white border border-gray-400 p-2 flex-1">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-xs font-bold bg-black text-white px-1">INPUT STREAM</span>
+                            <span class="text-xs text-red-600 font-bold" id="status-indicator">STANDBY</span>
+                        </div>
+                        <textarea id="input-text" placeholder="INITIALIZE DATA ENTRY..." onkeydown="handleKey(event)" onkeyup="handleKeyUp(event)"></textarea>
+                    </div>
+                    <div class="bg-gray-800 border border-black p-2 flex-1">
+                         <div class="flex justify-between mb-1">
+                            <span class="text-xs font-bold text-blue-300">OUTPUT STREAM</span>
+                            <button onclick="copyOutput()" class="text-xs text-white underline hover:text-blue-300">TRANSFER</button>
+                        </div>
+                        <textarea id="output-text" readonly class="bg-gray-900 text-blue-400 border-none focus:ring-0 font-bold font-mono"></textarea>
+                    </div>
+                </div>
+                
+                <button onclick="resetMachine()" class="mt-2 w-full bg-red-900 text-white py-1 hover:bg-red-700 transition-colors font-bold text-xs tracking-widest border border-red-950 uppercase">
+                    Purge & Reset Protocols
+                </button>
+            </div>
+
+            <!-- RIGHT: Logs & Visuals -->
+            <div class="panel" style="background: #000; color: #00ff00;">
+                <div class="panel-title" style="border-color: #005500; color: #00cc00;">
+                    <span>Heuristics</span>
+                    <span>DAT-X</span>
+                </div>
+                
+                <!-- Datastream Visual -->
+                <div id="datastream" class="h-1/2 font-mono text-[10px] text-green-700 overflow-hidden leading-tight mb-2 border-b border-green-900 opacity-60"></div>
+
+                <div class="panel-title" style="border-color: #005500; color: #00cc00;">
+                    <span>System Log</span>
+                </div>
+                <div id="log-container" class="font-mono text-[10px] space-y-1 h-1/2 overflow-y-auto text-green-500 p-1">
+                    <div>> SYSTEM READY_</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer text-gray-500 text-[9px] flex justify-between px-4 py-1 bg-gray-200 border-t border-gray-400 font-bold tracking-wider">
+            <div>IMPERIAL DEPARTMENT OF MILITARY RESEARCH // COMP-NODE 7</div>
+            <div>AUTH: VALIDATED</div>
+        </div>
+
+    </div>
+
+    <!-- Logic & Audio -->
+    <script>
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(500, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'scan') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(800, now + 1.0);
+                osc.frequency.linearRampToValueAtTime(200, now + 2.0);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.2, now + 0.5);
+                gain.gain.linearRampToValueAtTime(0, now + 2.0);
+                osc.start(now); osc.stop(now + 2.0);
+            } else if (type === 'grant') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(880, now + 0.1);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'rotor') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            }
+        }
+
+        // --- ENIGMA LOGIC ---
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const ROTORS = {
+            Beta:  { wiring: "LEYJVCNIXWPBKMQTOZSGFURDHA", notch: '' },
+            I:     { wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ", notch: 'Q' },
+            II:    { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE", notch: 'E' },
+            III:   { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO", notch: 'V' }
+        };
+        const REFLECTOR = "ENKQAUYWJICOPBLMDXZVFTHRGS"; // Thin B
+
+        let state = {
+            rotors: [0, 0, 0, 0], // Positions
+            rings: [0, 0, 0, 0],  // Ring Settings (Set by Keyword)
+            rotorConfig: ['Beta', 'I', 'II', 'III'],
+            harmonic: 0,
+            mode: 'encrypt' // 'encrypt' or 'decrypt'
+        };
+
+        function mod(n, m) { return ((n % m) + m) % m; }
+        function charToNum(c) { return alphabet.indexOf(c); }
+        function numToChar(n) { return alphabet[n]; }
+
+        function encryptCharacter(inputChar) {
+            if (!alphabet.includes(inputChar)) return inputChar;
+
+            // 1. Pre-Processing (Decrypt Mode: Reverse Harmonic)
+            let signal = charToNum(inputChar);
+            
+            if (state.mode === 'decrypt') {
+                signal = mod(signal - parseInt(state.harmonic), 26);
+            }
+
+            // 2. Step Rotors (Forward step before electrical signal)
+            stepRotors();
+            updateRotorDisplay();
+
+            // 3. Enigma Path (Reciprocal)
+            // Forward Pass
+            for (let i = 3; i >= 0; i--) signal = rotorPass(signal, i, true);
+            // Reflector
+            signal = charToNum(REFLECTOR[signal]);
+            // Reverse Pass
+            for (let i = 0; i <= 3; i++) signal = rotorPass(signal, i, false);
+
+            // 4. Post-Processing (Encrypt Mode: Add Harmonic)
+            if (state.mode === 'encrypt') {
+                signal = mod(signal + parseInt(state.harmonic), 26);
+            }
+
+            return numToChar(signal);
+        }
+
+        function stepRotors() {
+            // Simplified stepping for M4
+            // R3 (Fast) always steps.
+            // R2 steps if R3 at notch.
+            // R1 steps if R2 at notch (Double Step).
+            const r1 = state.rotors[1];
+            const r2 = state.rotors[2];
+            const r3 = state.rotors[3];
+            const n2 = ROTORS['II'].notch;
+            const n3 = ROTORS['III'].notch;
+
+            let turn2 = alphabet[r3] === n3;
+            let turn1 = alphabet[r2] === n2;
+
+            state.rotors[3] = (state.rotors[3] + 1) % 26;
+            if (turn2) state.rotors[2] = (state.rotors[2] + 1) % 26;
+            if (turn1) {
+                state.rotors[2] = (state.rotors[2] + 1) % 26; // Double step
+                state.rotors[1] = (state.rotors[1] + 1) % 26;
+            }
+        }
+
+        function rotorPass(signal, rotorIndex, isForward) {
+            const rName = state.rotorConfig[rotorIndex];
+            const rotor = ROTORS[rName];
+            const pos = state.rotors[rotorIndex];
+            const ring = state.rings[rotorIndex];
+            const offset = mod(pos - ring, 26);
+
+            if (isForward) {
+                let idx = mod(signal + offset, 26);
+                let wiredNum = charToNum(rotor.wiring[idx]);
+                return mod(wiredNum - offset, 26);
+            } else {
+                let idx = mod(signal + offset, 26);
+                let wiredIndex = rotor.wiring.indexOf(numToChar(idx));
+                return mod(wiredIndex - offset, 26);
+            }
+        }
+
+        // --- UI INTERACTION ---
+
+        function init() {
+            // Lamps
+            const board = document.getElementById('lamp-board');
+            alphabet.split('').forEach(char => {
+                const lamp = document.createElement('div');
+                lamp.className = 'lamp';
+                lamp.id = `lamp-${char}`;
+                lamp.innerText = char;
+                board.appendChild(lamp);
+            });
+            startDatastream();
+        }
+
+        function triggerScan() {
+            const scanner = document.getElementById('scanner');
+            const overlay = document.getElementById('login-overlay');
+            const main = document.getElementById('main-interface');
+            const text = document.getElementById('scanner-text');
+
+            if (scanner.classList.contains('scanning')) return;
+
+            scanner.classList.add('scanning');
+            playSound('scan');
+            text.innerText = "SCANNING BIOMETRICS...";
+            text.style.color = "#00e5ff";
+
+            setTimeout(() => {
+                text.innerText = "IDENTITY VERIFIED";
+                text.style.color = "#0f0";
+                playSound('grant');
+            }, 1500);
+
+            setTimeout(() => {
+                overlay.style.opacity = '0';
+                main.style.opacity = '1';
+                main.style.pointerEvents = 'all';
+                setTimeout(() => overlay.style.display = 'none', 800);
+            }, 2000);
+        }
+
+        function setMode(mode) {
+            state.mode = mode;
+            const btnEnc = document.getElementById('mode-enc');
+            const btnDec = document.getElementById('mode-dec');
+            const output = document.getElementById('output-text');
+            const input = document.getElementById('input-text');
+
+            if (mode === 'encrypt') {
+                btnEnc.classList.add('active');
+                btnDec.classList.remove('decrypt-active');
+                output.style.color = "#00e5ff"; // Blue
+                log("MODE SET: ENCRYPTION");
+            } else {
+                btnEnc.classList.remove('active');
+                btnDec.classList.add('decrypt-active');
+                output.style.color = "#ffaa00"; // Orange
+                log("MODE SET: DECRYPTION");
+            }
+        }
+
+        function updateKeyword() {
+            const val = document.getElementById('keyword-input').value.toUpperCase().replace(/[^A-Z]/g, '');
+            document.getElementById('keyword-input').value = val;
+            
+            // Map keyword characters to Ring Settings
+            // If keyword is shorter than 4, pad with A. If longer, truncate.
+            for(let i=0; i<4; i++) {
+                if (i < val.length) {
+                    state.rings[i] = charToNum(val[i]);
+                } else {
+                    state.rings[i] = 0; // Default A
+                }
+            }
+            if(val.length > 0) log(`KEYWORD UPDATED. RINGS ADJUSTED.`);
+        }
+
+        function handleKey(e) {
+            if(e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                e.preventDefault();
+                processInput(e.key.toUpperCase());
+            }
+        }
+
+        function handleKeyUp() {
+            document.querySelectorAll('.lamp').forEach(l => l.classList.remove('active'));
+            document.getElementById('status-indicator').innerText = "STANDBY";
+            document.getElementById('status-indicator').style.color = "#555";
+        }
+
+        function processInput(char) {
+            playSound('click');
+            const result = encryptCharacter(char);
+            
+            // Lamp logic: Always light up the result char
+            const lamp = document.getElementById(`lamp-${result}`);
+            if(lamp) lamp.classList.add('active');
+
+            const status = document.getElementById('status-indicator');
+            status.innerText = state.mode === 'encrypt' ? "ENCRYPTING" : "DECRYPTING";
+            status.style.color = state.mode === 'encrypt' ? "#00e5ff" : "#ff3300";
+
+            document.getElementById('input-text').value += char;
+            document.getElementById('output-text').value += result;
+        }
+
+        function rotateRotor(index, dir) {
+            playSound('rotor');
+            state.rotors[index] = mod(state.rotors[index] + dir, 26);
+            updateRotorDisplay();
+        }
+
+        function updateRotorDisplay() {
+            for(let i=0; i<4; i++) {
+                document.getElementById(`rotor-${i}`).innerText = alphabet[state.rotors[i]];
+            }
+        }
+
+        function updateHarmonic() {
+            state.harmonic = document.getElementById('harmonic-slider').value;
+            document.getElementById('freq-val').innerText = state.harmonic.padStart(2, '0');
+        }
+
+        function copyOutput() {
+            const copyText = document.getElementById("output-text");
+            copyText.select();
+            document.execCommand("copy");
+            log("OUTPUT COPIED TO CLIPBOARD");
+        }
+
+        function resetMachine() {
+            state.rotors = [0,0,0,0];
+            state.rings = [0,0,0,0];
+            document.getElementById('input-text').value = "";
+            document.getElementById('output-text').value = "";
+            document.getElementById('keyword-input').value = "";
+            document.getElementById('harmonic-slider').value = 0;
+            updateHarmonic();
+            updateRotorDisplay();
+            log("SYSTEM PURGED.");
+            playSound('rotor');
+        }
+
+        function log(msg) {
+            const c = document.getElementById('log-container');
+            const d = document.createElement('div');
+            d.innerText = `> ${msg}`;
+            c.appendChild(d);
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function startDatastream() {
+            const el = document.getElementById('datastream');
+            const chars = "XY01";
+            setInterval(() => {
+                let line = "";
+                for(let i=0; i<35; i++) line += chars[Math.floor(Math.random()*chars.length)];
+                el.innerText = line + "\n" + el.innerText.substring(0, 1000);
+            }, 80);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
